@@ -6,42 +6,98 @@ Dual-branch Geometric Constraint Graph Transformer for rare cell identification 
 
 Single-cell RNA sequencing provides high-resolution information about cellular heterogeneity. Rare cell identification is difficult because of class imbalance, dropout events, and measurement noise.
 
-DGCGT contains three main components. The Self-adaptive Iterative Smoothing Denoising module reduces sequencing noise with graph Laplacian smoothing. The Directional Centrality Constraint module describes local geometry and extracts boundary cells in the embedding space. The Feature Fusion module combines the original PCA features with the enhanced features and processes them with a Heterogeneous Graph Transformer.
+DGCGT uses three main components. Self-adaptive Iterative Smoothing Denoising reduces sequencing noise with graph Laplacian smoothing. Directional Centrality Constraint describes local geometry and identifies boundary cells in the embedding space. Feature Fusion combines the original PCA features with the enhanced features and processes them with a Heterogeneous Graph Transformer.
 
-The repository contains the core implementation, simulated-data experiments, real-data input instructions, manuscript figures, and supplied result tables.
+This repository provides:
 
-## Repository contents
+1. The core DGCGT implementation.
+2. The simulated-data benchmark.
+3. Instructions for preparing real single-cell data.
+4. The manuscript figures and supplied result tables.
+5. A research-only non-commercial license.
 
-`codes/DGCGT/` contains all core Python and R programs. The main entry points are:
+## Repository structure
 
-- `smoke_test.py` checks the complete pipeline on a small simulated dataset.
-- `run_simulated.py` runs the simulated benchmark.
-- `generate_simulated.py` generates simulated input files.
-- `run_experiments.py` runs real-data benchmarks and ablation experiments.
-- `analyze_results.py` summarizes existing split-level result files.
-- `visualize_results.py` creates benchmark and ablation figures.
+The main project structure is shown below.
 
-[`codes/DGCGT/README.md`](codes/DGCGT/README.md) explains the purpose of each core source file and the main functions.
+```text
+DGCGT/
+README.md
+LICENSE
+codes/DGCGT/
+data/
+Figures/
+Results/
+Manuscript.pdf
+```
 
-The supporting files are:
+All core programs are directly in codes/DGCGT. The purpose of each source file is described in codes/DGCGT/README.md.
 
-- `data/README.md` describes the required real-data file format.
-- `codes/DGCGT/PARAMETER_GUIDE.md` records the main experiment settings.
-- `Results/` contains the supplied aggregate result tables.
-- `Figures/` contains the supplied manuscript figures.
-- `Manuscript.pdf` contains the manuscript associated with this repository.
+## Workflow description
 
-## Environment
+Step 1. Data preparation
 
-The code requires Python 3.10, 3.11, or 3.12. The tested package versions are listed in `codes/DGCGT/requirements.txt`.
+Real datasets are loaded from a separate data directory. The required file format is described in data/README.md.
 
-The experiments can run on a CPU. A compatible PyTorch installation and a CUDA-enabled device can be used for larger experiments by changing the `--device` option to the appropriate PyTorch device.
+The required RNA files are:
 
-Full real-data and simulated benchmarks can require substantial memory and runtime. Run the smoke test before starting a full experiment.
+Gene_Cell.mtx: gene by cell expression matrix.
 
-## Installation
+Cell_names.tsv: cell names.
 
-Run these commands from the repository root.
+Gene_names.tsv: gene names.
+
+Cell_type.tsv: cell type labels.
+
+Paired RNA and ATAC data also require:
+
+Peak_Cell.mtx: peak by cell ATAC matrix.
+
+Peak_names.tsv: peak names.
+
+Gene_Peak.mtx: connections between genes and peaks.
+
+Rare_types.tsv is optional. It contains the rare cell types to be identified. If it is not provided, the program uses the two least frequent cell types as the rare-cell class.
+
+Step 2. Preprocessing and graph construction
+
+preprocess.py performs normalization, feature selection, scaling, and PCA. graph.py builds the heterogeneous graph with cell, gene, and peak nodes.
+
+Step 3. Feature enhancement
+
+modules.py contains the SISD denoising module and the DCC directional centrality module. The enhanced features are combined with the original PCA features in the DGCGT model.
+
+Step 4. Model training and evaluation
+
+models.py defines the Heterogeneous Graph Transformer and the DGCGT model. train.py performs training, ensemble prediction, split evaluation, and baseline evaluation. metrics.py calculates F1, Precision, Recall, AUPRC, and ROC AUC.
+
+Step 5. Experiment scripts
+
+run_simulated.py runs the simulated benchmark.
+
+run_experiments.py runs real-data benchmarks and ablation experiments.
+
+generate_simulated.py creates simulated input files.
+
+analyze_results.py summarizes generated result files.
+
+visualize_results.py creates benchmark and ablation figures.
+
+## Software requirements
+
+Python 3.10, 3.11, or 3.12 is required.
+
+The tested Python packages are listed in codes/DGCGT/requirements.txt.
+
+The main packages are numpy, pandas, scipy, scikit-learn, PyTorch, h5py, and matplotlib.
+
+The experiments can run on a CPU. A compatible CUDA-enabled PyTorch installation can be used for larger experiments.
+
+R is optional. It is required only for the FiRE, GapClust, and RaceID baseline script. The R requirements are described in codes/DGCGT/R_baselines_README.md.
+
+## Quick start
+
+Run the following commands from the repository root.
 
 ### 1. Clone the repository
 
@@ -52,107 +108,107 @@ git clone https://github.com/your-account/DGCGT.git
 cd DGCGT
 ```
 
-### 2. Create a Python environment
+### 2. Create the Python environment
 
-On Windows PowerShell:
+Windows PowerShell:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-On Linux or macOS:
+Linux or macOS:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install the dependencies
+### 3. Install the packages
 
 ```bash
 python -m pip install --upgrade pip
 python -m pip install -r codes/DGCGT/requirements.txt
 ```
 
-## Reproduction workflow
-
-### 1. Check the installation
+### 4. Check the installation
 
 ```bash
 python codes/DGCGT/smoke_test.py
 ```
 
-The command should print `Smoke test passed` and a small set of evaluation metrics.
+The output should contain the message Smoke test passed.
 
-### 2. Run a simulated smoke experiment
-
-This command is intended to verify the complete data, graph, model, training, and evaluation pipeline.
+### 5. Run a simulated smoke test
 
 ```bash
 python codes/DGCGT/run_simulated.py --smoke --out-dir results/reproduced/smoke
 ```
 
-### 3. Run the full simulated benchmark
-
-The default protocol runs the twelve simulated datasets described in the manuscript.
+### 6. Run the full simulated benchmark
 
 ```bash
 python codes/DGCGT/run_simulated.py --out-dir results/reproduced/simulated
 ```
 
-The output is written to separate folders for each simulated geometry and random seed. The number of cells, epochs, ensemble members, and other settings can be changed with `python codes/DGCGT/run_simulated.py --help`.
+The default protocol runs twelve simulated datasets. Use the help command to change the number of cells, epochs, ensemble members, or random seeds.
 
-### 4. Prepare real data
+```bash
+python codes/DGCGT/run_simulated.py --help
+```
 
-The original real datasets are not included because of their size and data-use restrictions. Prepare the files described in [`data/README.md`](data/README.md) and keep the cell order consistent across all files.
+## Real-data benchmark
 
-The required files are `Gene_Cell.mtx`, `Cell_names.tsv`, `Gene_names.tsv`, and `Cell_type.tsv`. Paired RNA and ATAC data additionally require `Peak_Cell.mtx`, `Peak_names.tsv`, and `Gene_Peak.mtx`. An optional `Rare_types.tsv` file can explicitly define the rare cell types.
+The original real datasets are not included because of their size and data-use restrictions. Prepare the input files described in data/README.md before running this analysis.
 
-### 5. Run a real-data benchmark
-
-The following is a complete Mouse retina example. Change `--data-dir` to the directory containing the prepared input files.
+The following command is a complete Mouse retina example. Change the data directory to the location of your prepared data.
 
 ```bash
 python codes/DGCGT/run_experiments.py benchmark --data-dir "D:\path\to\Mouse_retina" --dataset-name Mouse_retina --out-dir results/reproduced/Mouse_retina --n-hvg 150 --n-hvp 100 --max-genes 150 --max-peaks 100 --rna-pca-dim 40 --atac-pca-dim 10 --hidden-dim 128 --dropout 0.30 --dcc-weight 3.0 --sisd-alpha 0.10 --sisd-steps 1 --ensemble 13 --epochs 80
 ```
 
-The available dataset names are `Mouse_retina`, `B_lymphoma`, and `PBMCs_sampled`. The recommended settings for each dataset are listed in [`PARAMETER_GUIDE.md`](codes/DGCGT/PARAMETER_GUIDE.md).
+The available dataset names are Mouse_retina, B_lymphoma, and PBMCs_sampled. The recommended settings are recorded in codes/DGCGT/PARAMETER_GUIDE.md.
 
-### 6. Run the ablation experiment
+## Ablation analysis
 
-First run the full benchmark and use its split-level CSV as `--external-full-csv`. The ablation program retrains the variants without DCC, without FF, and without SISD.
+Run the full benchmark first. Then use its split-level CSV file as the input for the ablation analysis.
 
 ```bash
 python codes/DGCGT/run_experiments.py ablation --data-dir "D:\path\to\Mouse_retina" --dataset-name Mouse_retina --external-full-csv results/reproduced/Mouse_retina/Mouse_retina_split_results.csv --out-dir results/reproduced/Mouse_retina_ablation --n-hvg 150 --n-hvp 100 --max-genes 150 --max-peaks 100 --rna-pca-dim 40 --atac-pca-dim 10 --hidden-dim 128 --dropout 0.30 --dcc-weight 3.0 --sisd-alpha 0.10 --sisd-steps 1 --ensemble 13 --epochs 30
 ```
 
-### 7. Summarize results and create figures
+The ablation analysis retrains three variants. The variants remove DCC, FF, or SISD from DGCGT.
 
-To summarize split-level CSV files in one output folder:
+## Results and figures
+
+Summarize split-level result files in one output folder with:
 
 ```bash
 python codes/DGCGT/analyze_results.py --out_dir results/reproduced/Mouse_retina --markdown
 ```
 
-To create figures from the supplied aggregate tables:
+Create benchmark and ablation figures from the supplied result tables with:
 
 ```bash
 python codes/DGCGT/visualize_results.py --results-dir Results --output-dir results/reproduced/Figures
 ```
 
-## Evaluation
+The supplied aggregate tables are in Results. The supplied manuscript figures are in Figures. New experiment outputs should be written to a separate folder.
 
-The reported metrics are F1, Precision, Recall, AUPRC, and ROC AUC. F1, Precision, and Recall use a fixed prediction threshold of 0.5. The formal experiments use five repeated stratified splits, with 80 percent of the cells for training and 20 percent for testing. The random seed is 2026 unless it is changed on the command line.
+## Parameters and evaluation
 
-The optional R script `codes/DGCGT/run_r_baselines.R` evaluates the FiRE, GapClust, and RaceID baselines. The required R packages and command format are described in [`R_baselines_README.md`](codes/DGCGT/R_baselines_README.md).
+The main settings are recorded in codes/DGCGT/PARAMETER_GUIDE.md. Default settings are stored in config.py.
+
+The reported metrics are F1, Precision, Recall, AUPRC, and ROC AUC. F1, Precision, and Recall use a fixed prediction threshold of 0.5. The formal experiments use five repeated stratified splits. Eighty percent of the cells are used for training and twenty percent are used for testing. The default random seed is 2026.
 
 ## License
 
-The source code is released under the [DGCGT Research-Only Non-Commercial License](LICENSE). It allows free use, modification, and redistribution for non-commercial research, academic, educational, and personal purposes with attribution. Commercial use, including use in a commercial product, paid service, or commercial analysis, is not permitted.
+The source code is provided under the DGCGT Research-Only Non-Commercial License in LICENSE.
 
-This is a custom research-use license and is not an OSI-approved open-source license. The manuscript, figures, and third-party datasets may have separate rights or restrictions. Before making the repository public, replace the copyright holder information in `LICENSE` with the final author or institution name and add the publication DOI when available.
+The license allows free use, modification, and redistribution for non-commercial research, academic, educational, and personal purposes with attribution. Commercial use is not permitted. This includes commercial products, paid services, paid data analysis, and commercial consulting.
+
+This is a custom research-use license and is not an OSI-approved open-source license. The manuscript, figures, and third-party datasets may have separate rights or restrictions. Replace the copyright holder information in LICENSE with the final author or institution name before making the repository public.
 
 ## Citation
 
-If you use DGCGT, please cite the associated manuscript. Add the final bibliographic information and DOI to this section after publication.
+If you use DGCGT, please cite the associated manuscript. Add the final author list and publication DOI after publication.
