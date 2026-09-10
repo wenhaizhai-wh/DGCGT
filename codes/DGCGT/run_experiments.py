@@ -33,7 +33,12 @@ def add_data_options(parser: argparse.ArgumentParser) -> None:
 
 def add_model_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--ensemble", type=int, default=13)
-    parser.add_argument("--epochs", type=int, default=40)
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        help="fixed training epochs; defaults to the selected dataset protocol",
+    )
     parser.add_argument("--hidden-dim", type=int, required=True)
     parser.add_argument("--dropout", type=float, required=True)
     parser.add_argument("--dcc-weight", type=float, required=True)
@@ -57,9 +62,18 @@ def build_config(args: argparse.Namespace) -> ExperimentConfig:
 def load_inputs(args: argparse.Namespace):
     return load_multiomics(args.data_dir, 0, args.max_genes, args.max_peaks)
 
+def resolve_epochs(dataset_name: str, requested_epochs: int | None, ablation: bool) -> int:
+    """Resolve training epochs from an explicit value or the dataset protocol."""
+    if requested_epochs is not None:
+        return int(requested_epochs)
+    protocol = PER_DATASET_DGCGT.get(dataset_name, {})
+    key = "dgcgt_ablation_epochs" if ablation else "dgcgt_epochs"
+    return int(protocol.get(key, 40))
+
 def run_benchmark(args: argparse.Namespace) -> None:
     cfg = build_config(args)
     rna, atac, links, labels, metadata = load_inputs(args)
+    epochs = resolve_epochs(args.dataset_name, args.epochs, ablation=False)
     print(f"Loaded {args.dataset_name}: {metadata}", flush=True)
     run_dataset(
         rna,
@@ -76,7 +90,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
             "dgcgt_hidden_dim": args.hidden_dim,
             "dropout": args.dropout,
             "dgcgt_n_ensemble": args.ensemble,
-            "dgcgt_epochs": args.epochs,
+            "dgcgt_epochs": epochs,
             "dcc_weight": args.dcc_weight,
             "dcc_k_list": tuple(args.dcc_k_list),
             "SISD_piecewise": (
@@ -103,6 +117,7 @@ def read_full_csv(path: Path, dataset_name: str, n_splits: int) -> pd.DataFrame:
 def run_ablation(args: argparse.Namespace) -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    epochs = resolve_epochs(args.dataset_name, args.epochs, ablation=True)
     external = read_full_csv(Path(args.external_full_csv), args.dataset_name, args.n_splits)
     cfg = build_config(args)
     rna, atac, links, y, metadata = load_inputs(args)
@@ -112,7 +127,7 @@ def run_ablation(args: argparse.Namespace) -> None:
         "dgcgt_layers": 1,
         "dropout": args.dropout,
         "dgcgt_n_ensemble": args.ensemble,
-        "dgcgt_epochs": args.epochs,
+        "dgcgt_epochs": epochs,
         "dcc_weight": args.dcc_weight,
         "dcc_k_list": tuple(args.dcc_k_list),
         "SISD_piecewise": (
@@ -149,7 +164,7 @@ def run_ablation(args: argparse.Namespace) -> None:
         "full_retrained": False,
         "n_splits": args.n_splits,
         "ensemble": args.ensemble,
-        "epochs": args.epochs,
+        "epochs": epochs,
         "hidden_dim": args.hidden_dim,
         "dropout": args.dropout,
         "dcc_weight": args.dcc_weight,
@@ -162,7 +177,7 @@ def run_ablation(args: argparse.Namespace) -> None:
     (out_dir / "results_table.md").write_text(
         "# Variants-only ablation\n\n"
         f"{args.dataset_name}: {args.n_splits} stratified splits, {args.ensemble} ensemble members, "
-        f"{args.epochs} fixed epochs.\n\n"
+        f"{epochs} fixed epochs.\n\n"
         "Only w/o DCC, w/o FF, and w/o SISD were retrained. DGCGT Full was "
         "imported from the external benchmark CSV.\n\n"
         + summary_to_markdown(summary, title=args.dataset_name)
@@ -188,5 +203,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 
